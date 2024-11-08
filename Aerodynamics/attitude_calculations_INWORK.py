@@ -13,7 +13,7 @@ def attitude_angle(chord_length, coeff_lift, prop_diameter):
     :param prop_diameter: Propellor diameter in feet
     :returns: Pitch angle in degrees
     """
-    pitch = np.arctan((4 * chord_length * coeff_lift) / (np.pi * prop_diameter))
+    pitch = np.arctan((chord_length * coeff_lift) / (np.pi * prop_diameter))
     return round((pitch * 180 / np.pi), 3)
 
 
