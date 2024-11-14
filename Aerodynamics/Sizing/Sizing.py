@@ -79,8 +79,8 @@ plt.plot(
 )
 plt.scatter(W_rev1, S_rev1, label="Rev1")
 plt.scatter(W_rev2_min, S_rev2_min, label="Rev2 $W_{EMPTY}$")
-plt.scatter(W_rev2_quarter, S_rev2_quarter, label="0.25%", color="r")
-plt.scatter(W_rev2_max, S_rev2_max, label="Rev2 MTOW")
+plt.scatter(W_rev2_quarter, S_rev2_quarter, label="Rev2 $W_{25}$", color="r")
+plt.scatter(W_rev2_max, S_rev2_max, label="Rev2 $W_{MTOW}$")
 plt.text(
     20,
     8,
@@ -90,4 +90,5 @@ plt.text(
 plt.legend()
 
 plt.show()
+
 # %%
