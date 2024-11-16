@@ -13,15 +13,18 @@ def gather_dat_header(dat_file_path):
             if "PROP RPM" in line.strip():
                 next(dat_file)
                 header_variables = dat_file.readline().strip().split()
+                header_variables.insert(0, "RPM")
                 header_units = dat_file.readline().strip().split()
+                header_units.insert(0, "-")
                 return header_variables, header_units
 
 
 def is_rpm_set(line, units):
-    return line.strip().split() == units
+    return line.strip().split() == units[1:]
 
 
 def process_data_sets(dat_file, units, csv_writer=None):
+    RPM_multiplier = 1
     data_set = False
     if csv_writer is None:
         data = []
@@ -32,10 +35,13 @@ def process_data_sets(dat_file, units, csv_writer=None):
                 continue
             # flagged as a data set, and current line is still in the data set
             if data_set and line.strip():
-                data.append(line.strip().split())
+                row_data = line.strip().split()
+                row_data.insert(0, RPM_multiplier * 1000)
+                data.append(row_data)
             # still flagged as data set, but current line is not in the data set
             if data_set and not line.strip():
                 data_set = False
+                RPM_multiplier += 1
         return data
     else:
         for line in dat_file:
