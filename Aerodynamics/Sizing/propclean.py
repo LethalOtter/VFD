@@ -4,7 +4,7 @@ from tkinter import Tk
 from tkinter.filedialog import askopenfilename
 
 
-# Cleaning up DAT file and converting it into a csv file or pandas df
+# Cleaning up DAT file and converting it into a pandas df
 
 
 def gather_dat_header(dat_file_path):
@@ -23,58 +23,49 @@ def is_rpm_set(line, units):
     return line.strip().split() == units[1:]
 
 
-def process_data_sets(dat_file, units, csv_writer=None):
+def process_data_sets(dat_file, units):
     RPM_multiplier = 1
     data_set = False
-    if csv_writer is None:
-        data = []
-        for line in dat_file:
-            # not flagged as a data set yet, but identifies that the following line begins a data set
-            if not data_set and is_rpm_set(line, units):
-                data_set = True
-                continue
-            # flagged as a data set, and current line is still in the data set
-            if data_set and line.strip():
-                row_data = line.strip().split()
-                row_data.insert(0, RPM_multiplier * 1000)
-                data.append(row_data)
-            # still flagged as data set, but current line is not in the data set
-            if data_set and not line.strip():
-                data_set = False
-                RPM_multiplier += 1
-        return data
-    else:
-        for line in dat_file:
-            # not flagged as a data set yet, but identifies that the following line begins a data set
-            if not data_set and is_rpm_set(line, units):
-                data_set = True
-                continue
-            # flagged as a data set, and current line is still in the data set
-            if data_set and line.strip():
-                csv_writer.writerow(line.strip().split())
-            # still flagged as data set, but current line is not in the data set
-            if data_set and not line.strip():
-                csv_writer.writerow("")
-                data_set = False
+    data = []
+    for line in dat_file:
+        # not flagged as a data set yet, but identifies that the following line begins a data set
+        if not data_set and is_rpm_set(line, units):
+            data_set = True
+            continue
+        # flagged as a data set, and current line is still in the data set
+        if data_set and line.strip():
+            row_data = line.strip().split()
+            row_data.insert(0, RPM_multiplier * 1000)
+            data.append(row_data)
+        # still flagged as data set, but current line is not in the data set
+        if data_set and not line.strip():
+            data_set = False
+            RPM_multiplier += 1
+    return data
 
 
-def convert_dat_to_csv(dat_file_path, csv_file_path):
-    parameters, units = gather_dat_header(dat_file_path)
-    with (
-        open(dat_file_path, "r") as dat_file,
-        open(csv_file_path, "w", newline="") as csv_file,
-    ):
-        csv_writer = csv.writer(csv_file)
-        csv_writer.writerow(parameters)
-        csv_writer.writerow(units)
-        process_data_sets(dat_file, units, csv_writer)
+def make_unique(column_names):
+    seen = {}
+    for i, name in enumerate(column_names):
+        if name in seen:
+            seen[name] += 1
+            column_names[i] = f"{name}.{seen[name]}"
+        else:
+            seen[name] = 0
+    return column_names
 
 
 def convert_dat_to_dataframe(dat_file_path):
     parameters, units = gather_dat_header(dat_file_path)
     with open(dat_file_path, "r") as dat_file:
         data = process_data_sets(dat_file, units)
-    return pd.DataFrame(data, columns=parameters)
+
+    unique_parameters = make_unique(parameters)
+    df = pd.DataFrame(data, columns=unique_parameters)
+    df.drop(columns=["PWR", "Torque", "Thrust"], inplace=True)
+
+    df = df.apply(pd.to_numeric, errors="coerce")
+    return df
 
 
 if __name__ == "__main__":
