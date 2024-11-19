@@ -64,6 +64,9 @@ def convert_dat_to_dataframe(dat_file_path):
     df = pd.DataFrame(data, columns=unique_parameters)
     df.drop(columns=["PWR", "Torque", "Thrust"], inplace=True)
 
+    column_names = df.columns.tolist()
+    column_names = [name.strip(".1") for name in column_names]
+    df.columns = column_names
     df = df.apply(pd.to_numeric, errors="coerce")
     return df
 
