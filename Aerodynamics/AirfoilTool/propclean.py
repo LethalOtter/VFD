@@ -68,6 +68,7 @@ def convert_dat_to_dataframe(dat_file_path):
     column_names = [name.strip(".1") for name in column_names]
     df.columns = column_names
     df = df.apply(pd.to_numeric, errors="coerce")
+    df["V"] = df["V"] * 0.44704
     return df
 
 
