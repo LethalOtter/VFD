@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from scipy.interpolate import interp1d
+import scipy.interpolate as int
 import propclean as pc
 import airfoil_df as af
 import matplotlib.pyplot as plt
@@ -33,45 +33,53 @@ from tkinter.filedialog import askopenfilename
 # If Drag is greater than thrust reduce airspeed by some step size and repeat calculations
 # If Drag is less than thrust increase airspeed by some step size and repate calculations
 
-# Repeat calculations untill convergence criteria is met
+# Repeat calculations untill convergence criteria is met!!!
 
-# ADD ONS (not in order of importance)
+# ADD ONS
 
 # Adjusting cp location relative to cg, checking static margin for both We and MTOW
 # Calculating cp location instead of estimating at C_1/4
 # Adjusting flap size
 # Adjusting airfoil
 # Using low fidelity cfd methods from aerosandbox to optimize airfoil design
-# Using low fidelity cfd methods from aerosandbox to optimize wing placement
+# Using low fidelity cfd methods from aerosandbox to wing placement
 # Account for non axial aiflow effects on propellors
 # Introduce efficiency factor estimation/relationship
 # Record data sets for future use with ML estimation to reduce iterations
+
+
+def load_data(file_path, loader_func, drop_columns=None):
+    df = loader_func(file_path)
+    if drop_columns:
+        df.drop(columns=drop_columns, inplace=True)
+        df.dropna(inplace=True)
+    return df.apply(pd.to_numeric, errors="coerce")
+
+
+def interpolate_column_value(df, querry_column, querry, resultant_column):
+    f = int.interp1d(df[querry_column], df[resultant_column], fill_value="extrapolate")
+    return f(querry)
 
 
 def filter_dataframe_by_column_value(df, column_name, value):
     return df[df[column_name] == value]
 
 
-def interpolate_and_add_row(df, column_name, value, existing_df):
-    min_val = df[column_name].min()
-    max_val = df[column_name].max()
+def interpolate_row(df, querry_column, querry):
+    min_val = df[querry_column].min()
+    max_val = df[querry_column].max()
 
-    if min_val <= value <= max_val:
-        lower_bound = df[df[column_name] <= value]
-        upper_bound = df[df[column_name] > value]
+    if querry < min_val or max_val < querry:
+        return None
 
-        if not lower_bound.empty and not upper_bound.empty:
-            lower_row = lower_bound.iloc[-1]
-            upper_row = upper_bound.iloc[0]
-            new_row = lower_row + (upper_row - lower_row) * (
-                (value - lower_row[column_name])
-                / (upper_row[column_name] - lower_row[column_name])
-            )
-            new_row_df = pd.DataFrame([new_row])
-            existing_df = pd.concat([existing_df, new_row_df], ignore_index=True)
-            return existing_df
+    lower_row = df[df[querry_column] <= querry].iloc[-1]
+    upper_row = df[df[querry_column] > querry].iloc[-1]
 
-    return existing_df
+    weight = (querry - lower_row[querry_column]) / (
+        upper_row[querry_column] - lower_row[querry_column]
+    )
+
+    return lower_row + weight * (upper_row - lower_row)
 
 
 def constant_value_df(constant_parameter, constant_value):
@@ -82,26 +90,23 @@ def constant_value_df(constant_parameter, constant_value):
         filtered_prop_df = filter_dataframe_by_column_value(prop_df, "RPM", rpm)
         if filtered_prop_df.empty:
             break
-        interpolated_prop_df = interpolate_and_add_row(
-            filtered_prop_df, constant_parameter, constant_value, interpolated_prop_df
+        interpolated_prop_df = pd.concat(
+            [
+                interpolated_prop_df,
+                interpolate_row(filtered_prop_df, constant_parameter, constant_value),
+            ],
+            ignore_index=True,
         )
+
         rpm += 1000
     return interpolated_prop_df
 
 
-def find_power(df, V, T):
-    V_constant_df = constant_value_df(V[0], V[1])
-    thrust_matched_interpolation = pd.DataFrame(columns=df.columns)
-    thrust_matched_interpolation = interpolate_and_add_row(
-        V_constant_df, T[0], T[1] / 4, thrust_matched_interpolation
-    )
-
-    # Check if the interpolation was successful
-    if thrust_matched_interpolation.empty:
-        print("Interpolation failed: No valid data found for thrust.")
-        return None  # Handle as needed
-
-    return thrust_matched_interpolation["PWR"][0] * 4
+def find_power(df, V_tup, T_tup):
+    V_constant_df = constant_value_df(V_tup[0], V_tup[1])
+    print(V_constant_df)
+    pwr = interpolate_column_value(V_constant_df, T_tup[0], T_tup[1] / 4, "Pwr")
+    return pwr * 4
 
 
 def calc_lift(rho, v, S, cl):
@@ -122,10 +127,7 @@ def calc_moment(rho, v, S, c, cm):
 
 def aerodynamic_state(rho, V, S, W, airfoil_df):
     Cl_needed = calc_Cl(rho, V, S, W)
-    interpolated_airfoil_df = pd.DataFrame(columns=airfoil_df.columns)
-    interpolated_airfoil_df = interpolate_and_add_row(
-        airfoil_df, "Cl", Cl_needed, interpolated_airfoil_df
-    )
+    interpolated_airfoil_df = interpolate_row(airfoil_df, "Cl", Cl_needed)
 
     if interpolated_airfoil_df.empty:
         print("Interpolation failed: No valid data found.")
@@ -137,14 +139,17 @@ def aerodynamic_state(rho, V, S, W, airfoil_df):
 
 
 if __name__ == "__main__":
-    Tk().withdraw()
-    dat_file_path = askopenfilename(filetypes=[("Dat file", "*.dat")])
-    csv_file_path = askopenfilename(filetypes=[("Csv file", "*.csv")])
+    # Tk().withdraw()
+    # prop_dat_file_path = askopenfilename(filetypes=[("Dat file", "*.dat")])
+    # airfoil_csv_file_path = askopenfilename(filetypes=[("Csv file", "*.csv")])
 
-    prop_df = pc.convert_dat_to_dataframe(dat_file_path)
-    airfoil_df = af.load_csv(csv_file_path)
-    airfoil_df.drop(columns=["Polar key", "Airfoil", "Url"], inplace=True)
-    airfoil_df = airfoil_df.apply(pd.to_numeric, errors="coerce")
+    prop_dat_file_path = "/Users/alecestrada/Downloads/PER3_20x10.dat"
+    airfoil_csv_file_path = "/Users/alecestrada/Downloads/xf-naca0015-il-200000.csv"
+
+    prop_df = load_data(prop_dat_file_path, pc.convert_dat_to_dataframe)
+    airfoil_df = load_data(
+        airfoil_csv_file_path, af.load_csv, drop_columns=["Polar key", "Airfoil", "Url"]
+    )
 
     rho = 1.223  # kg/m^3
     wing_chord = 1.279 * 0.3048  # Meters  0.389
@@ -154,7 +159,7 @@ if __name__ == "__main__":
     x_LE = -1 * (3 / 12 * 0.3048)  # Meters
     x_ac = x_LE - wing_chord * 0.25  # Meters
     SM = x_ac / wing_chord
-    V_initial = "V", 25  # m/s
+    V_initial = "V", 100 * 0.44704  # m/s
     est_fuselage_drag = (
         0.298 * 0.5 * rho * V_initial[1] ** 2 * (wing_chord * 0.75) ** 2
     )  # Bullet approximation
@@ -169,9 +174,7 @@ if __name__ == "__main__":
         rho, V_initial[1], wing_area, weight, airfoil_df
     )
 
-    Lift_drag = calc_drag(
-        rho, V_initial[1], wing_area, interpolated_airfoil_data["Cd"][0]
-    )
+    Lift_drag = calc_drag(rho, V_initial[1], wing_area, interpolated_airfoil_data["Cd"])
     drag = "Thrust", Lift_drag + est_fuselage_drag
     print(f"\nDrag = {drag[1]}Newtons\n")
 
