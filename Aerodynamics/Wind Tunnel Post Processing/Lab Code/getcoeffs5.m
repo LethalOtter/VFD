@@ -2,8 +2,8 @@ function matrix = getcoeffs5(filename)
     [tareavgs, runavgs] = avgs3(filename);
     matrix = zeros(size(runavgs,1), 8);
     for i = 1:size(runavgs,1)
-        runavg = runavgs(i,:)
-        tareavg = tareavgs(i,:)
+        runavg = runavgs(i,:);
+        tareavg = tareavgs(i,:);
 
     %     tarep = readmatrix('polynomial_tare.txt');
         %input some other basic information in SI units
@@ -14,7 +14,7 @@ function matrix = getcoeffs5(filename)
         S = .2286 * 3 * .2286; %wing planform area in m^2(= b*c)
         
         %averages and measurement
-        aoa = runavg(13)
+        aoa = runavg(13);
     %     tareavg = zeros(1, 17);
     %     for i = 1:12
     %         tareavg(i) = polyval(tarep(i, :), runavg(13))
@@ -39,8 +39,8 @@ function matrix = getcoeffs5(filename)
         qy2 = meas(11);
         qz1 = meas(6);
         qz2 = meas(12);
-        fq1 = [fx1 fy1 fz1 qx1 qy1 qz1].'        
-        fq2 = [fx2 fy2 fz2 qx2 qy2 qz2].'
+        fq1 = [fx1 fy1 fz1 qx1 qy1 qz1].';        
+        fq2 = [fx2 fy2 fz2 qx2 qy2 qz2].';
       
         c = cos(po);
         s = sin(po);

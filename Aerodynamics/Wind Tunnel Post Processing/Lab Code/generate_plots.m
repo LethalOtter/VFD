@@ -1,6 +1,5 @@
 clc; close all; clear all;
-A = getcoeffs5('Test1_30msDataRun000.txt')
-
+A = getcoeffs5('/Users/alecestrada/Downloads/Des1Wind30mpsDataRun000.TXT');
 
 figure(1)
 plot(A(:,1), A(:,3), 'k*')
